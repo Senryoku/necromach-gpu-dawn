@@ -8,10 +8,13 @@
         "src",
         "build.zig",
         "build.zig.zon",
+        "CMakeLists.txt",
         "LICENSE",
         "LICENSE-APACHE",
         "LICENSE-MIT",
         "README.md",
+        "zig-patch-project.cmake",
+        "zig-toolchain.cmake",
     },
     .dependencies = .{},
 }
