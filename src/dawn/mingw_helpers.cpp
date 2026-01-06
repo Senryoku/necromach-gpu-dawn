@@ -56,7 +56,7 @@ constexpr GUID guid_from_string(const char str[37]) {
 // below, since MinGW does not have these as part of dxguid yet (not completely up
 // to date.)
 
-MINGW_UUIDOF(IDXGraphicsAnalysis, "9f251514-9d4d-4902-9d60-18988ab7d4b5")
+// MINGW_UUIDOF(IDXGraphicsAnalysis, "9f251514-9d4d-4902-9d60-18988ab7d4b5")
 
 // But of course, that handy macro only works for one of the two cases we need...
 // Such reusability.
@@ -72,5 +72,18 @@ extern "C++" {
   template<>
   const GUID &__mingw_uuidof<Microsoft::WRL::ComPtr<ID3D12Device>*>() {
     return __mingw_uuidof<Microsoft::WRL::ComPtr<ID3D12Device>>();
+  }
+
+  interface IDXGraphicsAnalysis;
+  
+  template<>
+  const GUID &__mingw_uuidof<IDXGraphicsAnalysis>() {
+    static constexpr IID __uuid_inst =
+        guid_from_string("9f251514-9d4d-4902-9d60-18988ab7d4b5");
+    return __uuid_inst;
+  }
+  template<>
+  const GUID &__mingw_uuidof<IDXGraphicsAnalysis*>() {
+    return __mingw_uuidof<IDXGraphicsAnalysis>();
   }
 }  // extern "C++"
