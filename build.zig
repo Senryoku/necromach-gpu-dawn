@@ -16,14 +16,17 @@ pub fn build(b: *std.Build) !void {
     b.getInstallStep().dependOn(&install_art.step);
 }
 
-pub fn link(b: *std.Build, dep_name: []const u8, module: *std.Build.Module) !void {
+pub fn link(b: *std.Build, dep_name: []const u8, exe: *std.Build.Step.Compile) !void {
     const dawn = b.dependency(dep_name, .{});
-    module.addLibraryPath(dawn.path("./build/src/dawn/native"));
-    module.linkSystemLibrary("webgpu_dawn", .{});
+    exe.root_module.addLibraryPath(dawn.path("./build/src/dawn/native"));
+    exe.root_module.linkSystemLibrary("webgpu_dawn", .{});
 
-    if (module.resolved_target.?.result.os.tag == .windows) {
+    const dawn_artifact = dawn.artifact("dawn");
+    exe.step.dependOn(&dawn_artifact.step);
+
+    if (exe.root_module.resolved_target.?.result.os.tag == .windows) {
         // zdawn.root_module.linkSystemLibrary("mingw_helpers", .{});
-        module.addCSourceFile(.{ .file = .{ .dependency = .{ .dependency = dawn, .sub_path = "src/dawn/mingw_helpers.cpp" } } }); // FIXME: Not ideal.
+        exe.root_module.addCSourceFile(.{ .file = .{ .dependency = .{ .dependency = dawn, .sub_path = "src/dawn/mingw_helpers.cpp" } } }); // FIXME: Not ideal.
     }
 }
 
