@@ -3,18 +3,28 @@ const std = @import("std");
 const log = std.log.scoped(.necromach_gpu_dawn);
 
 pub fn build(b: *std.Build) !void {
-    // TODO: Support optimization settings
-    const optimize = b.standardOptimizeOption(.{});
-    _ = optimize;
+    // const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
     const options = Options{
         .install_libs = true,
         .from_source = true,
     };
-    try buildFromSource(b, target.result, options);
+    const lib = try buildFromSource(b, target, .ReleaseFast, options);
 
-    _ = b.step("check", "Do nothing, but at least zls won't starve your cpu trying to run cmake");
+    const install_art = b.addInstallArtifact(lib, .{});
+    b.getInstallStep().dependOn(&install_art.step);
+}
+
+pub fn link(b: *std.Build, dep_name: []const u8, module: *std.Build.Module) !void {
+    const dawn = b.dependency(dep_name, .{});
+    module.addLibraryPath(dawn.path("./build/src/dawn/native"));
+    module.linkSystemLibrary("webgpu_dawn", .{});
+
+    if (module.resolved_target.?.result.os.tag == .windows) {
+        // zdawn.root_module.linkSystemLibrary("mingw_helpers", .{});
+        module.addCSourceFile(.{ .file = .{ .dependency = .{ .dependency = dawn, .sub_path = "src/dawn/mingw_helpers.cpp" } } }); // FIXME: Not ideal.
+    }
 }
 
 pub const Options = struct {
@@ -105,45 +115,54 @@ fn isTargetSupported(target: std.Target) bool {
     };
 }
 
-fn buildFromSource(b: *std.Build, target_triple: std.Target, options: Options) !void {
+fn buildFromSource(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, options: Options) !*std.Build.Step.Compile {
+    // TODO: Support options
+    _ = options;
+
     // Source scanning requires that these files actually exist on disk, so we must download them
     // here right now if we are building from source.
     // FIXME
     try ensureGitRepoCloned(b, "https://github.com/a-day-old-bagel/necromach-dawn", "bddcf42234576c6b00a58f7b0e82cadc948cf297", b.pathFromRoot("./libs/dawn"));
 
-    _ = options;
+    const target_str = try target.result.zigTriple(b.allocator);
+    defer b.allocator.free(target_str);
 
-    {
-        const target_str = try target_triple.zigTriple(b.allocator);
-        defer b.allocator.free(target_str);
-        const cmake_d_target = try std.fmt.allocPrint(b.allocator, "-DTARGET={s}", .{target_str});
-
-        if (!isTargetSupported(target_triple)) {
-            std.log.err("Target '{s}' is not currently supported.", .{target_str});
-            return error.TargetNotSupported;
-        } else {
-            std.log.info("Building zdawn for target {s}.", .{target_str});
-        }
-
-        try exec(b.allocator, &.{
-            "cmake",
-            "-G",
-            "Ninja",
-            "-B",
-            "build",
-            "-DCMAKE_TOOLCHAIN_FILE=zig-toolchain.cmake",
-            cmake_d_target,
-            "-DCMAKE_BUILD_TYPE=Release",
-        }, b.pathFromRoot("."));
-
-        try exec(b.allocator, &.{
-            "cmake",
-            "--build",
-            "./build",
-            "--config",
-            "Release",
-        }, b.pathFromRoot("."));
+    if (!isTargetSupported(target.result)) {
+        log.err("Target '{s}' is not currently supported.", .{target_str});
+        return error.TargetNotSupported;
+    } else {
+        log.info("Building dawn for target {s}.", .{target_str});
     }
+
+    const toolchain_path = b.path("zig-toolchain.cmake").getPath(b);
+    const build_dir = b.path("./build").getPath(b);
+    // CMake Configure Step
+    var cmake_configure = b.addSystemCommand(&.{ "cmake", "-G", "Ninja", "-B", build_dir });
+    cmake_configure.addArgs(&.{
+        b.fmt("-DCMAKE_TOOLCHAIN_FILE={s}", .{toolchain_path}),
+        b.fmt("-DTARGET={s}", .{target_str}),
+        b.fmt("-DCMAKE_BUILD_TYPE={s}", .{switch (optimize) {
+            .Debug => "Debug",
+            .ReleaseSafe, .ReleaseFast, .ReleaseSmall => "Release",
+        }}),
+    });
+    // Tell Zig this step depends on the source files
+    cmake_configure.addDirectoryArg(b.path("libs/dawn"));
+    cmake_configure.setCwd(b.path("."));
+
+    // CMake Build Step
+    var cmake_build = b.addSystemCommand(&.{ "cmake", "--build", build_dir, "--config", "Release" });
+    cmake_build.setCwd(b.path("."));
+    cmake_build.step.dependOn(&cmake_configure.step);
+
+    const lib = b.addLibrary(.{
+        .name = "dawn",
+        .linkage = .static,
+        .root_module = b.createModule(.{ .target = target, .root_source_file = b.path("src/empty.zig") }),
+    });
+    lib.step.dependOn(&cmake_build.step);
+    // lib.root_module.addObjectFile(b.path("build/src/dawn/native/libwebgpu_dawn.a"));
+    return lib;
 }
 
 fn ensureGitRepoCloned(b: *std.Build, clone_url: []const u8, revision: []const u8, dir: []const u8) !void {
