@@ -18,13 +18,13 @@ Due to the deprecation of Mach,the dependency of using tool from Mach is decoupl
 
 To build the library, all you need is to run:
 
-```
+```zig
 zig build
 ```
 
 ## To use as a dependency
 
 If `webgpu_dawn` is the name of the dependency in your `build.zig.zon`:
-```
+```zig
 try @import("webgpu_dawn").link(b, "webgpu_dawn", your_module);
 ```
