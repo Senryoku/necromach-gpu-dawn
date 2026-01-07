@@ -176,7 +176,7 @@ fn ensureGitRepoCloned(b: *std.Build, clone_url: []const u8, revision: []const u
 
     ensureGit(allocator);
 
-    if (std.fs.openDirAbsolute(dir, .{})) |_| {
+    if (std.fs.cwd().openDir(dir, .{})) |_| {
         const current_revision = try getCurrentGitRevision(allocator, dir);
         if (!std.mem.eql(u8, current_revision, revision)) {
             // Reset to the desired revision
