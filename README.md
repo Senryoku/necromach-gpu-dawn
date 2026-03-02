@@ -28,3 +28,19 @@ If `webgpu_dawn` is the name of the dependency in your `build.zig.zon`:
 ```zig
 try @import("webgpu_dawn").link(b, "webgpu_dawn", your_module);
 ```
+
+## If the build script fails
+
+It basically does this:
+
+```sh
+git clone -c core.longpaths=true https://github.com/Senryoku/necromach-dawn libs/dawn
+cmake -DCMAKE_TOOLCHAIN_FILE="zig-toolchain.cmake" -DCMAKE_BUILD_TYPE=Release -G Ninja -B ./build
+cmake --build ./build --config Release
+```
+
+Add these to the cmake configure command on Linux:
+```sh
+	-DDAWN_USE_WAYLAND=ON
+	-DDAWN_USE_X11=ON
+```
