@@ -149,6 +149,12 @@ fn buildFromSource(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             .ReleaseSafe, .ReleaseFast, .ReleaseSmall => "Release",
         }}),
     });
+    if (isLinuxDesktopLike(target.result.os.tag)) {
+        cmake_configure.addArgs(&.{
+            "-DDAWN_USE_WAYLAND=ON",
+            "-DDAWN_USE_X11=ON",
+        });
+    }
     // Tell Zig this step depends on the source files
     cmake_configure.addDirectoryArg(b.path("libs/dawn"));
     cmake_configure.setCwd(b.path("."));
