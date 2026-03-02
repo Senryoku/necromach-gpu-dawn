@@ -125,7 +125,7 @@ fn buildFromSource(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     // Source scanning requires that these files actually exist on disk, so we must download them
     // here right now if we are building from source.
     // FIXME
-    try ensureGitRepoCloned(b, "https://github.com/a-day-old-bagel/necromach-dawn", "bddcf42234576c6b00a58f7b0e82cadc948cf297", b.pathFromRoot("./libs/dawn"));
+    try ensureGitRepoCloned(b, "https://github.com/Senryoku/necromach-dawn", "dbc5bdffbd56f0457f6052a7ff8f2b95206ddd91", b.pathFromRoot("./libs/dawn"));
 
     const target_str = try target.result.zigTriple(b.allocator);
     defer b.allocator.free(target_str);
