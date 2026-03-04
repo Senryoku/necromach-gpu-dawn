@@ -1,0 +1,78 @@
+name: Build Project
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build for ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-windows-gnu
+            os: windows-latest
+            extra_cmake_args: ""
+          - target: x86_64-linux-gnu
+            os: ubuntu-latest
+            extra_cmake_args: "-DDAWN_USE_WAYLAND=ON -DDAWN_USE_X11=ON"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Install Ninja (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja
+
+      - name: Install Dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            pkg-config \
+            libxkbcommon-dev \
+            libwayland-dev \
+            wayland-protocols \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxcb-dri3-dev \
+            libxrandr-dev \
+            libxi-dev \
+            libxcursor-dev \
+            libxinerama-dev \
+            libgl-dev \
+            libvulkan-dev
+
+      - name: Clone necromach-dawn dependency
+        run: git clone -c core.longpaths=true https://github.com/Senryoku/necromach-dawn libs/dawn
+
+      - name: Configure CMake
+        run: >
+          cmake 
+          -DTARGET=${{ matrix.target }} 
+          -DCMAKE_TOOLCHAIN_FILE="zig-toolchain.cmake" 
+          -DCMAKE_BUILD_TYPE=Release 
+          ${{ matrix.extra_cmake_args }} 
+          -G Ninja 
+          -B ./build
+
+      - name: Build Project
+        run: cmake --build ./build --config Release
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dawn-libraries-${{ matrix.target }}
+          path: |
+            build/libs/dawn/src/dawn/native/libwebgpu_dawn.a
