@@ -1,0 +1,3 @@
+[submodule "libs/dawn"]
+	path = libs/dawn
+	url = "https://github.com/Senryoku/necromach-dawn#cd9d154e8f31b704a6046fb7c6fdba21e380be60"

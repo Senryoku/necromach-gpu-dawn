@@ -122,11 +122,6 @@ fn buildFromSource(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     // TODO: Support options
     _ = options;
 
-    // Source scanning requires that these files actually exist on disk, so we must download them
-    // here right now if we are building from source.
-    // FIXME
-    try ensureGitRepoCloned(b, "https://github.com/Senryoku/necromach-dawn", "cd9d154e8f31b704a6046fb7c6fdba21e380be60", b.pathFromRoot("./libs/dawn"));
-
     const target_str = try target.result.zigTriple(b.allocator);
     defer b.allocator.free(target_str);
 
@@ -174,36 +169,6 @@ fn buildFromSource(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     return lib;
 }
 
-fn ensureGitRepoCloned(b: *std.Build, clone_url: []const u8, revision: []const u8, dir: []const u8) !void {
-    const allocator = b.allocator;
-    if (isEnvVarTruthy(allocator, "NO_ENSURE_SUBMODULES") or isEnvVarTruthy(allocator, "NO_ENSURE_GIT")) {
-        return;
-    }
-
-    ensureGit(allocator);
-
-    if (std.fs.cwd().openDir(dir, .{})) |_| {
-        const current_revision = try getCurrentGitRevision(allocator, dir);
-        if (!std.mem.eql(u8, current_revision, revision)) {
-            // Reset to the desired revision
-            exec(allocator, &[_][]const u8{ "git", "fetch" }, dir) catch |err| std.debug.print("warning: failed to 'git fetch' in {s}: {s}\n", .{ dir, @errorName(err) });
-            try exec(allocator, &[_][]const u8{ "git", "checkout", "--quiet", "--force", revision }, dir);
-            // try exec(allocator, &[_][]const u8{ "git", "submodule", "update", "--init", "--recursive" }, dir);
-        }
-        return;
-    } else |err| return switch (err) {
-        error.FileNotFound => {
-            std.log.info("cloning required dependency..\ngit clone {s} {s}..\n", .{ clone_url, dir });
-
-            try exec(allocator, &[_][]const u8{ "git", "clone", "-c", "core.longpaths=true", clone_url, dir }, b.pathFromRoot("."));
-            try exec(allocator, &[_][]const u8{ "git", "checkout", "--quiet", "--force", revision }, dir);
-            // try exec(allocator, &[_][]const u8{ "git", "submodule", "update", "--init", "--recursive" }, dir);
-            return;
-        },
-        else => err,
-    };
-}
-
 fn exec(allocator: std.mem.Allocator, argv: []const []const u8, cwd: []const u8) !void {
     var child = std.process.Child.init(argv, allocator);
     child.cwd = cwd;
@@ -215,34 +180,4 @@ fn getCurrentGitRevision(allocator: std.mem.Allocator, cwd: []const u8) ![]const
     allocator.free(result.stderr);
     if (result.stdout.len > 0) return result.stdout[0 .. result.stdout.len - 1]; // trim newline
     return result.stdout;
-}
-
-fn ensureGit(allocator: std.mem.Allocator) void {
-    const argv = &[_][]const u8{ "git", "--version" };
-    const result = std.process.Child.run(.{
-        .allocator = allocator,
-        .argv = argv,
-        .cwd = ".",
-    }) catch { // e.g. FileNotFound
-        std.log.err("mach: error: 'git --version' failed. Is git not installed?", .{});
-        std.process.exit(1);
-    };
-    defer {
-        allocator.free(result.stderr);
-        allocator.free(result.stdout);
-    }
-    if (result.term.Exited != 0) {
-        std.log.err("mach: error: 'git --version' failed. Is git not installed?", .{});
-        std.process.exit(1);
-    }
-}
-
-fn isEnvVarTruthy(allocator: std.mem.Allocator, name: []const u8) bool {
-    if (std.process.getEnvVarOwned(allocator, name)) |truthy| {
-        defer allocator.free(truthy);
-        if (std.mem.eql(u8, truthy, "true")) return true;
-        return false;
-    } else |_| {
-        return false;
-    }
 }

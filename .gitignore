@@ -16,7 +16,6 @@
 /build-*/
 /docgen_tmp/
 
-libs*
 zig-out*
 out/
 
